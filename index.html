@@ -673,13 +673,14 @@
 
             currentUser = JSON.parse(jsonPayload);
 
-            // Verificar que sea Laura o Lucas (dominios específicos)
-            if (currentUser.email && (currentUser.email.includes('laura') || currentUser.email.includes('lucas'))) {
+            // Verificar que sea Lucas o Laura (emails específicos)
+            const emailsPermitidos = ['lucaswells@gmail.com', 'lauraibullon@gmail.com'];
+            if (emailsPermitidos.includes(currentUser.email)) {
                 mostrarApp();
                 cargarMovimientos();
                 setInterval(cargarMovimientos, 3000);
             } else {
-                alert('Acceso restringido a Laura y Lucas');
+                alert('Acceso restringido. Solo Lucas y Laura pueden acceder.');
                 google.accounts.id.renderButton(document.getElementById('google-signin-button'), { theme: 'dark' });
             }
         }
