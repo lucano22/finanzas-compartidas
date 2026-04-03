@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>💳 Finanzas Compartidas - Laura + Lucas</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         * {
             margin: 0;
@@ -62,48 +63,8 @@
             font-size: 14px;
         }
 
-        .login-form input {
-            width: 100%;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 14px 16px;
-            border-radius: 10px;
-            font-size: 16px;
-            margin-bottom: 16px;
-        }
-
-        .login-form input::placeholder {
-            color: rgba(255, 255, 255, 0.4);
-        }
-
-        .login-form input:focus {
-            outline: none;
-            border-color: #4ade80;
-            background: rgba(74, 222, 128, 0.05);
-        }
-
-        .login-form button {
-            width: 100%;
-            background: linear-gradient(to right, #4ade80, #10b981);
-            border: none;
-            color: white;
-            padding: 12px;
-            border-radius: 10px;
-            font-weight: 600;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
-        .login-form button:hover {
-            background: linear-gradient(to right, #22c55e, #059669);
-        }
-
-        #error-msg {
-            color: #ef4444;
-            font-size: 13px;
-            margin-top: 12px;
-            display: none;
+        #google-signin-button {
+            margin: 0 auto;
         }
 
         .container {
@@ -114,9 +75,12 @@
         .header {
             margin-bottom: 32px;
             padding-top: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .header h1 {
+        .header-left h1 {
             font-size: 32px;
             font-weight: 900;
             background: linear-gradient(to right, #4ade80, #06b6d4, #4ade80);
@@ -125,8 +89,44 @@
             margin-bottom: 8px;
         }
 
-        .header p {
+        .header-left p {
             color: #94a3b8;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .user-details {
+            text-align: right;
+        }
+
+        .user-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .logout-btn {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 12px;
+        }
+
+        .logout-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
         }
 
         .tabs {
@@ -467,20 +467,24 @@
         <div class="login-box">
             <h1>🔒</h1>
             <p>Finanzas Compartidas<br>Laura + Lucas</p>
-            
-            <div class="login-form">
-                <input type="password" id="password-input" placeholder="Contraseña" autocomplete="off">
-                <button onclick="verificarContraseña()">Entrar</button>
-                <div id="error-msg">Contraseña incorrecta</div>
-            </div>
+            <div id="google-signin-button"></div>
         </div>
     </div>
 
     <!-- APP MAIN -->
     <div class="container" id="app-container" style="display: none;">
         <div class="header">
-            <h1>💳 Finanzas Compartidas</h1>
-            <p>Laura + Lucas | Sincronizado en tiempo real ✅</p>
+            <div class="header-left">
+                <h1>💳 Finanzas Compartidas</h1>
+                <p>Laura + Lucas | Sincronizado en tiempo real ✅</p>
+            </div>
+            <div class="user-info">
+                <img id="user-avatar" class="user-avatar">
+                <div class="user-details">
+                    <div class="user-name" id="user-name"></div>
+                </div>
+                <button class="logout-btn" onclick="logout()">Salir</button>
+            </div>
         </div>
 
         <div class="tabs">
@@ -606,8 +610,8 @@
     </div>
 
     <script>
-        // CONFIGURACIÓN DE SEGURIDAD
-        const CONTRASEÑA_CORRECTA = "laura2024"; // CAMBIAR ESTO
+        // Google OAuth Client ID
+        const GOOGLE_CLIENT_ID = '415267784916-3j6sf0bhu5tmv0l9m7v0eoal9q1q7fc6.apps.googleusercontent.com';
         
         // Credenciales Supabase
         const SUPABASE_URL = 'https://ktwlclwghynwrkfogjsg.supabase.co';
@@ -617,10 +621,12 @@
         let tipoActual = 'ingreso';
         let chartGastos = null;
         let chartGastosBar = null;
+        let currentUser = null;
 
         const categoriasIngresos = {
             'Sueldo': ['Laura', 'Lucas'],
             'Bonus': ['Laura', 'Lucas'],
+            'Alquileres': ['Pano', 'Marqués', 'Molinos', 'Remedios', 'Ricardo', 'Quevedo'],
             'Renta Pisos': ['Piso Zaragoza', 'Piso Extranjero', 'Airbnb'],
             'Inversiones': ['ETF', 'Cuenta Remunerada', 'Acciones', 'Otro'],
             'Otro Ingreso': ['Freelance', 'Venta', 'Reembolso']
@@ -628,42 +634,69 @@
 
         const categoriasGastos = {
             'Vivir': ['Compras', 'Comida', 'Casa', 'Servicios', 'Transporte'],
+            'Alquiler': ['Pano', 'Marqués', 'Molinos', 'Remedios', 'Ricardo', 'Quevedo'],
             'Inversiones': ['Compra Acciones', 'Depósito', 'Comisiones'],
             'Impuestos': ['IRPF', 'IVA', 'Otros'],
             'Pisos': ['Mantenimiento', 'Reforma', 'Servicios', 'Impuestos'],
-            'Entretenimiento': ['Hobbies', 'Viajes', 'Eventos'],
+            'Entretenimiento': ['Hobbies', 'Viajes', 'Eventos', 'Vacaciones'],
             'Salud': ['Médico', 'Farmacia', 'Deporte'],
             'Educación': ['Cursos', 'Libros', 'Certificaciones']
         };
 
-        // Verificar login
-        function verificarContraseña() {
-            const password = document.getElementById('password-input').value;
-            if (password === CONTRASEÑA_CORRECTA) {
-                document.getElementById('login-container').style.display = 'none';
-                document.getElementById('app-container').style.display = 'block';
-                inicializarApp();
+        // Inicializar Google Sign-In
+        window.onload = function() {
+            google.accounts.id.initialize({
+                client_id: GOOGLE_CLIENT_ID,
+                callback: handleCredentialResponse
+            });
+
+            google.accounts.id.renderButton(
+                document.getElementById('google-signin-button'),
+                { 
+                    theme: 'dark',
+                    size: 'large',
+                    width: '320'
+                }
+            );
+
+            document.getElementById('fecha').valueAsDate = new Date();
+            actualizarSubcategorias();
+        };
+
+        function handleCredentialResponse(response) {
+            // Decodificar JWT
+            const base64Url = response.credential.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+
+            currentUser = JSON.parse(jsonPayload);
+
+            // Verificar que sea Laura o Lucas (dominios específicos)
+            if (currentUser.email && (currentUser.email.includes('laura') || currentUser.email.includes('lucas'))) {
+                mostrarApp();
+                cargarMovimientos();
+                setInterval(cargarMovimientos, 3000);
             } else {
-                document.getElementById('error-msg').style.display = 'block';
-                document.getElementById('password-input').value = '';
-                setTimeout(() => {
-                    document.getElementById('error-msg').style.display = 'none';
-                }, 2000);
+                alert('Acceso restringido a Laura y Lucas');
+                google.accounts.id.renderButton(document.getElementById('google-signin-button'), { theme: 'dark' });
             }
         }
 
-        // Enter para enviar
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById('password-input').addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') verificarContraseña();
-            });
-        });
+        function mostrarApp() {
+            document.getElementById('login-container').style.display = 'none';
+            document.getElementById('app-container').style.display = 'block';
+            document.getElementById('user-name').textContent = currentUser.name;
+            document.getElementById('user-avatar').src = currentUser.picture;
+        }
 
-        function inicializarApp() {
-            document.getElementById('fecha').valueAsDate = new Date();
-            actualizarSubcategorias();
-            cargarMovimientos();
-            setInterval(cargarMovimientos, 3000);
+        function logout() {
+            google.accounts.id.revoke(currentUser.email, () => {
+                document.getElementById('app-container').style.display = 'none';
+                document.getElementById('login-container').style.display = 'flex';
+                currentUser = null;
+            });
         }
 
         async function cargarMovimientos() {
@@ -769,7 +802,7 @@
         }
 
         function actualizarGraficos(ingresos, gastos) {
-            const gastosDetalle = ['Vivir', 'Inversiones', 'Impuestos', 'Pisos', 'Entretenimiento', 'Salud', 'Educación']
+            const gastosDetalle = ['Vivir', 'Alquiler', 'Inversiones', 'Impuestos', 'Pisos', 'Entretenimiento', 'Salud', 'Educación']
                 .map(cat => ({
                     name: cat,
                     total: movimientos
@@ -840,7 +873,7 @@
             const gastosTotal = movimientos.filter(m => m.tipo === 'gasto').reduce((sum, m) => sum + parseFloat(m.monto), 0);
             const ingresosTotal = movimientos.filter(m => m.tipo === 'ingreso').reduce((sum, m) => sum + parseFloat(m.monto), 0);
 
-            const gastosDetalle = ['Vivir', 'Inversiones', 'Impuestos', 'Pisos', 'Entretenimiento', 'Salud', 'Educación']
+            const gastosDetalle = ['Vivir', 'Alquiler', 'Inversiones', 'Impuestos', 'Pisos', 'Entretenimiento', 'Salud', 'Educación']
                 .map(cat => ({
                     name: cat,
                     total: movimientos
@@ -856,7 +889,7 @@
                     <div class="desglose-amount" style="color: #ef4444;">€ ${g.total.toFixed(2)}</div>
                 </div>`).join('');
 
-            const ingresosDetalle = ['Sueldo', 'Bonus', 'Renta Pisos', 'Inversiones', 'Otro Ingreso']
+            const ingresosDetalle = ['Sueldo', 'Bonus', 'Alquileres', 'Renta Pisos', 'Inversiones', 'Otro Ingreso']
                 .map(cat => ({
                     name: cat,
                     total: movimientos
